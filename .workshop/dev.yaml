@@ -1,0 +1,62 @@
+name: dev
+base: ubuntu@24.04
+
+sdks:
+  - name: node
+    plugs:
+      my-data:
+        interface: mount
+        workshop-target: /mnt/my-data
+        read-only: false
+  - name: project-ssh-share-sdk
+
+actions:
+  setup: |
+    set -e
+
+    mkdir -p ~/.ssh
+    chmod 700 ~/.ssh
+    rm -f ~/.ssh/id_ed25519.pub
+
+    SSH_PUBLIC_KEY=""
+    for env_file in /project/.env .env; do
+      if [ -f "$env_file" ]; then
+        SSH_PUBLIC_KEY=$(grep -E '^(export )?(SSH_PUBLIC_KEY|SSH_PUB_KEY)=' "$env_file" 2>/dev/null | tail -n 1 | sed -E 's/^(export )?(SSH_PUBLIC_KEY|SSH_PUB_KEY)=//; s/^["'\''"]//; s/["'\''"]$//' || true)
+        if [ -z "$SSH_PUBLIC_KEY" ]; then
+          SSH_PUBLIC_KEY=$(grep -E '^(ssh-(ed25519|rsa)|ecdsa-)' "$env_file" 2>/dev/null | head -n 1 || true)
+        fi
+        if [ -n "$SSH_PUBLIC_KEY" ]; then
+          break
+        fi
+      fi
+    done
+
+    if [ -z "$SSH_PUBLIC_KEY" ] || [ "$SSH_PUBLIC_KEY" = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" ]; then
+      echo "Error: SSH public key not found or placeholder used." >&2
+      echo "Please store your SSH public key in .env of project (see .env.example):" >&2
+      echo "  SSH_PUBLIC_KEY=\"ssh-ed25519 AAAA...\"" >&2
+      exit 1
+    fi
+
+    echo "$SSH_PUBLIC_KEY" > ~/.ssh/id_ed25519.pub
+    chmod 644 ~/.ssh/id_ed25519.pub
+
+    cat > ~/.ssh/config <<'EOF'
+    Host github.com
+      HostName github.com
+      User git
+      IdentityFile ~/.ssh/id_ed25519.pub
+      IdentitiesOnly yes
+      StrictHostKeyChecking accept-new
+    EOF
+    chmod 600 ~/.ssh/config
+
+    echo "SSH setup completed"
+    echo "ls -la ~/.ssh : "
+    ls -la ~/.ssh
+    echo "ssh -T github.com : "
+    SSH_TEST_OUTPUT=$(ssh -T -o StrictHostKeyChecking=accept-new github.com 2>&1 || true)
+    echo "$SSH_TEST_OUTPUT"
+    if echo "$SSH_TEST_OUTPUT" | grep -q "successfully authenticated"; then
+      echo "SSH authentication with GitHub succeeded!"
+    fi
