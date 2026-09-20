@@ -1,0 +1,51 @@
+name: dev
+base: ubuntu@24.04
+
+sdks:
+  - name: node
+    plugs:
+      my-data:
+        interface: mount
+        workshop-target: /mnt/my-data
+        read-only: false
+  - name: project-ssh-share-sdk
+
+actions:
+  setup: |
+    set -e
+
+    mkdir -p ~/.ssh
+
+    SSH_PUBLIC_KEY=""
+    for env_file in /project/.env .env; do
+      if [ -f "$env_file" ]; then
+        SSH_PUBLIC_KEY=$(grep -E '^(export )?(SSH_PUBLIC_KEY|SSH_PUB_KEY)=' "$env_file" 2>/dev/null | tail -n 1 | sed -E 's/^(export )?(SSH_PUBLIC_KEY|SSH_PUB_KEY)=//; s/^["'\''"]//; s/["'\''"]$//')
+        if [ -z "$SSH_PUBLIC_KEY" ]; then
+          SSH_PUBLIC_KEY=$(grep -E '^(ssh-(ed25519|rsa)|ecdsa-)' "$env_file" 2>/dev/null | head -n 1 || true)
+        fi
+        if [ -n "$SSH_PUBLIC_KEY" ]; then
+          break
+        fi
+      fi
+    done
+
+    if [ -z "$SSH_PUBLIC_KEY" ]; then
+      echo "SSH public key not found. Please store ssh public key in .env of project (see .env.example)"
+      exit 1
+    fi
+
+    echo "$SSH_PUBLIC_KEY" > ~/.ssh/id_ed25519.pub
+
+    cat > ~/.ssh/config <<'EOF'
+    Host github.com
+      HostName github.com
+      User git
+      IdentityFile ~/.ssh/id_ed25519.pub
+      IdentitiesOnly yes
+    EOF
+
+    echo "SSH setup completed"
+    echo "ls -la ~/.ssh : "
+    ls -la ~/.ssh
+    echo "ssh -T github.com : "
+    ssh -T github.com

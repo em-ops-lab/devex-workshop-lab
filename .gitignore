@@ -1,0 +1,15 @@
+# Logs
+logs
+*.log
+
+# Diagnostic reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Runtime data
+.workshop.lock
+
+# Dependency directories
+node_modules/
+
+# ENV's
+*.env

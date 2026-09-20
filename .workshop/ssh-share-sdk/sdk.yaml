@@ -1,0 +1,12 @@
+name: ssh-share-sdk
+title: SSH agent forwarding
+base: ubuntu@24.04
+version: "0.1"
+summary: Forwards the host SSH agent for git auth
+description: |
+  Forwards the host's SSH agent socket into the workshop so git
+  operations can authenticate using the host's ~/.ssh/tish keys.
+license: MIT
+plugs:
+  ssh-agent:
+    interface: ssh-agent
